@@ -39,6 +39,24 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   # Defaults to false. If set to true, columns containing no value will not get set.
   config :skip_empty_columns, :validate => :boolean, :default => false
 
+  # Define a set of datatype conversions to be applied to columns.
+  # Possible conversions are integer, float, date, date_time, boolean
+  #
+  # # Example:
+  # [source,ruby]
+  #     filter {
+  #       csv {
+  #         convert => { "column1" => "integer", "column2" => "boolean" }
+  #       }
+  #     }
+  config :convert, :validate => :hash, :default => {}
+
+  ##
+  # List of valid conversion types used for the convert option
+  ##
+  VALID_CONVERT_TYPES = [ "integer", "float", "date", "date_time", "boolean" ].freeze
+
+
   # The character encoding used in this codec. Examples include "UTF-8" and
   # "CP1252".
   config :charset, :validate => ::Encoding.name_list, :default => "UTF-8"
@@ -46,6 +64,13 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   def register
     @converter = LogStash::Util::Charset.new(@charset)
     @converter.logger = @logger
+
+    # validate conversion types to be the valid ones.
+    @convert.each_pair do |column, type|
+      if !VALID_CONVERT_TYPES.include?(type)
+        raise LogStash::ConfigurationError, "#{type} is not a valid conversion type."
+      end
+    end
 
     @headers = false
     @options = { :col_sep => @separator, :quote_char => @quote_char }
@@ -61,13 +86,21 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
       else
         decoded = {}
         values.each_with_index do |fields, index|
+          field_name, value = nil, nil
           if fields.is_a?(String) && !( @skip_empty_columns && fields.nil?)  # No headers
             next if ignore_field?(index)
             field_name =  ( !@columns[index].nil? ? @columns[index] : "column#{(index+1)}")
-            decoded[field_name] = fields
+            value      = fields
           elsif fields.is_a?(Array) # Got headers
-            decoded[fields[0]] = fields[1]
+            field_name = fields[0]
+            value      = fields[1]
           end
+          next unless field_name
+          decoded[field_name] = if should_transform?(field_name)
+                                  transform(field_name, value)
+                                else
+                                  value
+                                end
         end
         yield LogStash::Event.new(decoded) if block_given?
       end
@@ -91,6 +124,40 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
 
   def ignore_field?(index)
     !@columns[index] && !@autogenerate_column_names
+  end
+
+  def should_transform?(field_name)
+    !@convert[field_name].nil?
+  end
+
+  def transform(field_name, value)
+    transformation = @convert[field_name].to_sym
+    converters[transformation].call(value)
+  end
+
+  def converters
+    @converters ||= {
+      :integer => lambda do |value|
+        CSV::Converters[:integer].call(value)
+      end,
+      :float => lambda do |value|
+        CSV::Converters[:float].call(value)
+
+      end,
+      :date => lambda do |value|
+        CSV::Converters[:date].call(value)
+
+      end,
+      :date_time => lambda do |value|
+        CSV::Converters[:date_time].call(value)
+      end,
+      :boolean => lambda do |value|
+        value = value.strip.downcase
+        return false if value == "false"
+        return true  if value == "true"
+        return value
+      end
+    }
   end
 
 end # class LogStash::Codecs::Plain

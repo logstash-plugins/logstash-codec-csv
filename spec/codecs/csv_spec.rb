@@ -168,7 +168,39 @@ describe LogStash::Codecs::CSV do
           expect(event["city"]).to eq("berlin")
         end
       end
-
     end
+
+    describe "using field convertion" do
+
+      let(:config) do
+        { "convert" => { "column1" => "integer", "column3" => "boolean" } }
+      end
+      let(:data)   { "1234,bird,false" }
+
+      it "get converted values to the expected type" do
+        codec.decode(data) do |event|        
+          expect(event["column1"]).to eq(1234)
+          expect(event["column2"]).to eq("bird")
+          expect(event["column3"]).to eq(false)
+        end
+      end
+
+      context "when using column names" do
+
+        let(:config) do
+          { "convert" => { "custom1" => "integer", "custom3" => "boolean" },
+            "columns" => ["custom1", "custom2", "custom3"] }
+        end
+
+        it "get converted values to the expected type" do
+          codec.decode(data) do |event|
+            expect(event["custom1"]).to eq(1234)
+            expect(event["custom2"]).to eq("bird")
+            expect(event["custom3"]).to eq(false)
+          end
+        end
+      end
+    end
+
   end
 end
