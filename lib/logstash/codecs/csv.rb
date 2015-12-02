@@ -17,6 +17,12 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   # Optional.
   config :quote_char, :validate => :string, :default => '"'
 
+  # Treats the first line received as the hearder information, this information will
+  # be used to compose the field names in the generated events. Note this information can
+  # be reset on demand, useful for example when dealing with new files in the file input
+  # or new request in the http_poller. Default => false
+  config :include_headers, :validate => :boolean, :default => false
+
   # The character encoding used in this codec. Examples include "UTF-8" and
   # "CP1252".
   config :charset, :validate => ::Encoding.name_list, :default => "UTF-8"
@@ -25,6 +31,7 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
     @converter = LogStash::Util::Charset.new(@charset)
     @converter.logger = @logger
 
+    @headers = false
     @options = { :col_sep => @separator, :quote_char => @quote_char }
   end
 
@@ -32,20 +39,34 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
     data = @converter.convert(data)
     begin
       values = CSV.parse_line(data, @options)
-      decoded = {}
-      values.each_with_index do |value, index|
-        decoded["column#{(index+1)}"] = value
+      if @include_headers && !@headers
+        @headers = true
+        @options[:headers] = values
+      else
+        decoded = {}
+        values.each_with_index do |fields, index|
+          if fields.is_a?(String)  # No headers
+            decoded["column#{(index+1)}"] = fields
+          elsif fields.is_a?(Array) # Got headers
+            decoded[fields[0]] = fields[1]
+          end
+        end
+        yield LogStash::Event.new(decoded) if block_given?
       end
-      yield LogStash::Event.new(decoded)
     rescue CSV::MalformedCSVError => e
       @logger.info("CSV parse failure. Falling back to plain-text", :error => e, :data => data)
-      yield LogStash::Event.new("message" => data, "tags" => ["_csvparsefailure"])
+      yield LogStash::Event.new("message" => data, "tags" => ["_csvparsefailure"]) if block_given?
     end
   end
 
   def encode(event)
     csv_data = CSV.generate_line(event.to_hash.values, @options)
     @on_event.call(event, csv_data)
+  end
+
+  def reset
+    @headers = false
+    @options.delete(:headers)
   end
 
 end # class LogStash::Codecs::Plain

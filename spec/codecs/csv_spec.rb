@@ -83,5 +83,42 @@ describe LogStash::Codecs::CSV do
       end
     end
 
+    describe "having headers" do
+
+      let(:data) do
+        [ "size,animal,movie", "big,bird,sesame street"]
+      end
+
+      let(:new_data) do
+        [ "host,country,city", "example.com,germany,berlin"]
+      end
+
+      let(:config) do
+        { "include_headers" => true }
+      end
+
+      it "include header information when requested" do
+        codec.decode(data[0]) # Read the headers
+        codec.decode(data[1]) do |event|
+          expect(event["size"]).to eq("big")
+          expect(event["animal"]).to eq("bird")
+          expect(event["movie"]).to eq("sesame street")
+        end
+      end
+
+      it "reset headers and fetch the new ones" do
+        data.each do |row|
+          codec.decode(row)
+        end
+        codec.reset
+        codec.decode(new_data[0]) # set the new headers
+        codec.decode(new_data[1]) do |event|
+          expect(event["host"]).to eq("example.com")
+          expect(event["country"]).to eq("germany")
+          expect(event["city"]).to eq("berlin")
+        end
+      end
+
+    end
   end
 end
