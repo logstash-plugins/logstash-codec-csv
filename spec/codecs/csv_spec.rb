@@ -36,6 +36,42 @@ describe LogStash::Codecs::CSV do
           expect(event["address"]).to eq("sesame street")
         end
       end
+
+      context "parse csv skipping empty columns" do
+
+        let(:data)    { "val1,,val3" }
+
+        let(:config) do
+          { "skip_empty_columns" => true,
+            "columns" => ["custom1", "custom2", "custom3"] }
+        end
+
+        it "extract all the values" do
+          codec.decode(data) do |event|
+            expect(event["custom1"]).to eq("val1")
+            expect(event.to_hash).not_to include("custom2")
+            expect(event["custom3"]).to eq("val3")
+          end
+        end
+      end
+
+      context "parse csv without autogeneration of names" do
+
+        let(:data)    { "val1,val2,val3" }
+        let(:config) do
+          {  "autogenerate_column_names" => false,
+             "columns" => ["custom1", "custom2"] }
+        end
+
+        it "extract all the values" do
+          codec.decode(data) do |event|
+            expect(event["custom1"]).to eq("val1")
+            expect(event["custom2"]).to eq("val2")
+            expect(event["column3"]).to be_falsey
+          end
+        end
+      end
+
     end
 
     describe "custom separator" do
