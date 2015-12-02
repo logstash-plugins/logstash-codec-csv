@@ -7,6 +7,14 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
 
   config_name "csv"
 
+  # Define a list of column names (in the order they appear in the CSV,
+  # as if it were a header line). If `columns` is not configured, or there
+  # are not enough columns specified, the default column names are
+  # "column1", "column2", etc. In the case that there are more columns
+  # in the data than specified in this column list, extra columns will be auto-numbered:
+  # (e.g. "user_defined_1", "user_defined_2", "column3", "column4", etc.)
+  config :columns, :validate => :array, :default => []
+
   # Define the column separator value. If this is not specified, the default
   # is a comma `,`.
   # Optional.
@@ -46,7 +54,8 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
         decoded = {}
         values.each_with_index do |fields, index|
           if fields.is_a?(String)  # No headers
-            decoded["column#{(index+1)}"] = fields
+            field_name =  ( !@columns[index].nil? ? @columns[index] : "column#{(index+1)}")
+            decoded[field_name] = fields
           elsif fields.is_a?(Array) # Got headers
             decoded[fields[0]] = fields[1]
           end

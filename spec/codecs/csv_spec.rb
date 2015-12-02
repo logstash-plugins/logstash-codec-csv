@@ -23,6 +23,20 @@ describe LogStash::Codecs::CSV do
       end
     end
 
+    describe "given column names" do
+      let(:doc)    { "big,bird,sesame street" }
+      let(:config) do
+        { "columns" => ["first", "last", "address" ] }
+      end
+
+      it "extract all the values" do
+        codec.decode(data) do |event|
+          expect(event["first"]).to eq("big")
+          expect(event["last"]).to eq("bird")
+          expect(event["address"]).to eq("sesame street")
+        end
+      end
+    end
 
     describe "custom separator" do
       let(:data) { "big,bird;sesame street" }
