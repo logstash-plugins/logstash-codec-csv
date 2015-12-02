@@ -1,4 +1,6 @@
-# Logstash Plugin
+# Logstash CSV Codec
+
+## WIP: Under Development, NOT FOR PRODUCTION
 
 This is a plugin for [Logstash](https://github.com/elasticsearch/logstash).
 
