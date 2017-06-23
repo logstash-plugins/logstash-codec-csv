@@ -7,7 +7,7 @@ START - GENERATED VARIABLES, DO NOT EDIT!
 :version: %VERSION%
 :release_date: %RELEASE_DATE%
 :changelog_url: %CHANGELOG_URL%
-:include_path: ../../../logstash/docs/include
+:include_path: ../../../../logstash/docs/include
 ///////////////////////////////////////////
 END - GENERATED VARIABLES, DO NOT EDIT!
 ///////////////////////////////////////////
@@ -25,8 +25,6 @@ include::{include_path}/plugin_header.asciidoc[]
 [id="plugins-{type}s-{plugin}-options"]
 ==== Csv Codec Configuration Options
 
-This plugin supports the following configuration options plus the <<plugins-{type}s-common-options>> described later.
-
 [cols="<,<,<",options="header",]
 |=======================================================================
 |Setting |Input type|Required
@@ -39,9 +37,6 @@ This plugin supports the following configuration options plus the <<plugins-{typ
 | <<plugins-{type}s-{plugin}-separator>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-skip_empty_columns>> |<<boolean,boolean>>|No
 |=======================================================================
-
-Also see <<plugins-{type}s-common-options>> for a list of options supported by all
-codec plugins.
 
 &nbsp;
 
@@ -135,5 +130,3 @@ Define whether empty columns should be skipped.
 Defaults to false. If set to true, columns containing no value will not get set.
 
 
-
-include::{include_path}/{type}.asciidoc[]
