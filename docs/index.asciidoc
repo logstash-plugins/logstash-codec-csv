@@ -20,7 +20,7 @@ include::{include_path}/plugin_header.asciidoc[]
 
 ==== Description
 
-
+The csv codec takes CSV data, parses it and passes it along.
 
 [id="plugins-{type}s-{plugin}-options"]
 ==== Csv Codec Configuration Options
