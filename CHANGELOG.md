@@ -1,3 +1,6 @@
+## 0.1.5
+  - Fixed asciidoc formatting for example [#tbd](https://github.com/logstash-plugins/logstash-codec-csv/pull/tbd)
+
 ## 0.1.4
   - Fix some documentation issues
 
