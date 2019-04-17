@@ -1,3 +1,6 @@
+## 0.1.5
+  - Fixed asciidoc formatting for example [#3](https://github.com/logstash-plugins/logstash-codec-csv/pull/3)
+
 ## 0.1.4
   - Fix some documentation issues
 
