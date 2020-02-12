@@ -1,3 +1,5 @@
+## 1.0.0
+  - Fixed dependencies and overhaul to csv filter level, fixed & more specs.
 ## 0.1.5
   - Fixed asciidoc formatting for example [#3](https://github.com/logstash-plugins/logstash-codec-csv/pull/3)
 
