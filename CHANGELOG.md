@@ -1,3 +1,5 @@
+## 1.0.0
+  - Fixed dependencies to work with logstash v6 and up. Overhauled to match features of the CSV Filter. Improved spec coverage [#4](https://github.com/logstash-plugins/logstash-codec-csv/pull/4)
 ## 0.1.5
   - Fixed asciidoc formatting for example [#3](https://github.com/logstash-plugins/logstash-codec-csv/pull/3)
 

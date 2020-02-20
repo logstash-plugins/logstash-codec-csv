@@ -12,14 +12,13 @@ describe LogStash::Codecs::CSV do
   end
 
   describe "decode" do
-
     let(:data) { "big,bird,sesame street" }
 
     it "return an event from CSV data" do
       codec.decode(data) do |event|
-        expect(event["column1"]).to eq("big")
-        expect(event["column2"]).to eq("bird")
-        expect(event["column3"]).to eq("sesame street")
+        expect(event.get("column1")).to eq("big")
+        expect(event.get("column2")).to eq("bird")
+        expect(event.get("column3")).to eq("sesame street")
       end
     end
 
@@ -31,9 +30,9 @@ describe LogStash::Codecs::CSV do
 
       it "extract all the values" do
         codec.decode(data) do |event|
-          expect(event["first"]).to eq("big")
-          expect(event["last"]).to eq("bird")
-          expect(event["address"]).to eq("sesame street")
+          expect(event.get("first")).to eq("big")
+          expect(event.get("last")).to eq("bird")
+          expect(event.get("address")).to eq("sesame street")
         end
       end
 
@@ -48,9 +47,9 @@ describe LogStash::Codecs::CSV do
 
         it "extract all the values" do
           codec.decode(data) do |event|
-            expect(event["custom1"]).to eq("val1")
+            expect(event.get("custom1")).to eq("val1")
             expect(event.to_hash).not_to include("custom2")
-            expect(event["custom3"]).to eq("val3")
+            expect(event.get("custom3")).to eq("val3")
           end
         end
       end
@@ -65,9 +64,9 @@ describe LogStash::Codecs::CSV do
 
         it "extract all the values" do
           codec.decode(data) do |event|
-            expect(event["custom1"]).to eq("val1")
-            expect(event["custom2"]).to eq("val2")
-            expect(event["column3"]).to be_falsey
+            expect(event.get("custom1")).to eq("val1")
+            expect(event.get("custom2")).to eq("val2")
+            expect(event.get("column3")).to be_falsey
           end
         end
       end
@@ -83,8 +82,8 @@ describe LogStash::Codecs::CSV do
 
       it "return an event from CSV data" do
         codec.decode(data) do |event|
-          expect(event["column1"]).to eq("big,bird")
-          expect(event["column2"]).to eq("sesame street")
+          expect(event.get("column1")).to eq("big,bird")
+          expect(event.get("column2")).to eq("sesame street")
         end
       end
     end
@@ -98,9 +97,9 @@ describe LogStash::Codecs::CSV do
 
       it "return an event from CSV data" do
         codec.decode(data) do |event|
-          expect(event["column1"]).to eq("big")
-          expect(event["column2"]).to eq("bird")
-          expect(event["column3"]).to eq("sesame street")
+          expect(event.get("column1")).to eq("big")
+          expect(event.get("column2")).to eq("bird")
+          expect(event.get("column3")).to eq("sesame street")
         end
       end
 
@@ -110,9 +109,9 @@ describe LogStash::Codecs::CSV do
 
         it "return an event from CSV data" do
           codec.decode(data) do |event|
-            expect(event["column1"]).to eq("big")
-            expect(event["column2"]).to eq("bird")
-            expect(event["column3"]).to eq("sesame, street")
+            expect(event.get("column1")).to eq("big")
+            expect(event.get("column2")).to eq("bird")
+            expect(event.get("column3")).to eq("sesame, street")
           end
         end
       end
@@ -125,9 +124,9 @@ describe LogStash::Codecs::CSV do
 
         it "return an event from CSV data" do
           codec.decode(data) do |event|
-            expect(event["column1"]).to eq("big")
-            expect(event["column2"]).to eq("bird")
-            expect(event["column3"]).to eq('"sesame" street')
+            expect(event.get("column1")).to eq("big")
+            expect(event.get("column2")).to eq("bird")
+            expect(event.get("column3")).to eq('"sesame" street')
           end
         end
       end
@@ -144,28 +143,15 @@ describe LogStash::Codecs::CSV do
       end
 
       let(:config) do
-        { "include_headers" => true }
+        { "autodetect_column_names" => true }
       end
 
       it "include header information when requested" do
         codec.decode(data[0]) # Read the headers
         codec.decode(data[1]) do |event|
-          expect(event["size"]).to eq("big")
-          expect(event["animal"]).to eq("bird")
-          expect(event["movie"]).to eq("sesame street")
-        end
-      end
-
-      it "reset headers and fetch the new ones" do
-        data.each do |row|
-          codec.decode(row)
-        end
-        codec.reset
-        codec.decode(new_data[0]) # set the new headers
-        codec.decode(new_data[1]) do |event|
-          expect(event["host"]).to eq("example.com")
-          expect(event["country"]).to eq("germany")
-          expect(event["city"]).to eq("berlin")
+          expect(event.get("size")).to eq("big")
+          expect(event.get("animal")).to eq("bird")
+          expect(event.get("movie")).to eq("sesame street")
         end
       end
     end
@@ -179,9 +165,9 @@ describe LogStash::Codecs::CSV do
 
       it "get converted values to the expected type" do
         codec.decode(data) do |event|        
-          expect(event["column1"]).to eq(1234)
-          expect(event["column2"]).to eq("bird")
-          expect(event["column3"]).to eq(false)
+          expect(event.get("column1")).to eq(1234)
+          expect(event.get("column2")).to eq("bird")
+          expect(event.get("column3")).to eq(false)
         end
       end
 
@@ -194,13 +180,80 @@ describe LogStash::Codecs::CSV do
 
         it "get converted values to the expected type" do
           codec.decode(data) do |event|
-            expect(event["custom1"]).to eq(1234)
-            expect(event["custom2"]).to eq("bird")
-            expect(event["custom3"]).to eq(false)
+            expect(event.get("custom1")).to eq(1234)
+            expect(event.get("custom2")).to eq("bird")
+            expect(event.get("custom3")).to eq(false)
           end
         end
       end
     end
+  end
 
+  describe "encode" do
+    context "not including headers" do
+      let(:event) { LogStash::Event.new({"f1" => "v1", "f2" => "v2"}) }
+
+      context "without columns" do
+        let(:config) do
+          { "include_headers" => false, "columns" => [] }
+        end
+
+        it "should encode to single CSV line" do
+          codec.on_event do |e, d|
+            expect(d.chomp.split(",").sort).to eq("v1,v2,1,#{event.timestamp}".split(",").sort)
+          end
+          codec.encode(event)
+        end
+      end
+
+      context "with columns" do
+        let(:config) do
+          { "include_headers" => false, "columns" => ["f1", "f2"] }
+        end
+
+        it "should encode to single CSV line" do
+          codec.on_event do |e, d|
+            expect(d).to eq("v1,v2\n")
+          end
+          codec.encode(event)
+        end
+      end
+    end
+
+    context "including headers" do
+      let(:event) { LogStash::Event.new({"f1" => "v1", "f2" => "v2"}) }
+
+      context "without columns" do
+        let(:config) do
+          { "include_headers" => true, "columns" => [] }
+        end
+
+        it "should encode to two CSV line" do
+          lines = []
+          codec.on_event do |e, d|
+            lines << d
+          end
+          codec.encode(event)
+          expect(lines[0].chomp.split(",").sort).to eq("f1,f2,@version,@timestamp".split(",").sort)
+          expect(lines[1].chomp.split(",").sort).to eq("v1,v2,1,#{event.timestamp}".split(",").sort)
+        end
+      end
+
+      context "with columns" do
+        let(:config) do
+          { "include_headers" => true, "columns" => ["f1", "f2"] }
+        end
+
+        it "should encode to two CSV line" do
+          lines = []
+          codec.on_event do |e, d|
+            lines << d
+          end
+          codec.encode(event)
+          expect(lines[0]).to eq("f1,f2\n")
+          expect(lines[1]).to eq("v1,v2\n")
+        end
+      end
+    end
   end
 end
