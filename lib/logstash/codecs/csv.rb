@@ -1,9 +1,16 @@
 # encoding: utf-8
 require "logstash/codecs/base"
 require "logstash/util/charset"
+
+require 'logstash/plugin_mixins/ecs_compatibility_support'
+require 'logstash/plugin_mixins/event_support'
+
 require "csv"
 
 class LogStash::Codecs::CSV < LogStash::Codecs::Base
+
+  include LogStash::PluginMixins::ECSCompatibilitySupport
+  include LogStash::PluginMixins::EventSupport
 
   config_name "csv"
 
@@ -57,6 +64,12 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   # The character encoding used in this codec. Examples include "UTF-8" and
   # "CP1252".
   config :charset, :validate => ::Encoding.name_list, :default => "UTF-8"
+
+  # Defines a target field for placing decoded fields.
+  # If this setting is omitted, data gets stored at the root (top level) of the event.
+  #
+  # NOTE: the target is only relevant while decoding data into a new event.
+  config :target, :validate => :string
 
   CONVERTERS = {
     :integer => lambda do |value|
@@ -129,7 +142,7 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
         end
       end
 
-      yield LogStash::Event.new(decoded)
+      yield new_event(decoded, target_namespace: target)
     rescue CSV::MalformedCSVError => e
       @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => data)
       yield LogStash::Event.new("message" => data, "tags" => ["_csvparsefailure"])
