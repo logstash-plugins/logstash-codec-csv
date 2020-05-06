@@ -1,6 +1,7 @@
 # encoding: utf-8
 require "logstash/codecs/base"
 require "logstash/util/charset"
+require "logstash/util/buftok"
 require "csv"
 
 class LogStash::Codecs::CSV < LogStash::Codecs::Base
@@ -41,6 +42,9 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   # Define whether column names should be auto-detected from the header column or not.
   # Defaults to false.
   config :autodetect_column_names, :validate => :boolean, :default => false
+
+  # Define the line delimiter
+  config :delimiter, :validate => :string, :default => "\n"
 
   # Define a set of datatype conversions to be applied to columns.
   # Possible conversions are integer, float, date, date_time, boolean
@@ -88,6 +92,7 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   CONVERTERS.freeze
 
   def register
+    @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
     @converter = LogStash::Util::Charset.new(@charset)
     @converter.logger = @logger
 
@@ -108,10 +113,38 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
     @logger.debug? && @logger.debug("CSV parsing options", :col_sep => @separator, :quote_char => @quote_char)
   end
 
-  def decode(data)
-    data = @converter.convert(data)
+  def decode(data, &block)
+    @buffer.extract(data).each do |line|
+      parse(@converter.convert(line), &block)
+    end
+  end
+
+  def encode(event)
+    if @include_headers
+      csv_data = CSV.generate_line(select_keys(event), :col_sep => @separator, :quote_char => @quote_char, :headers => true)
+      @on_event.call(event, csv_data)
+
+      # output headers only once per codec lifecycle
+      @include_headers = false
+    end
+
+    csv_data = CSV.generate_line(select_values(event), :col_sep => @separator, :quote_char => @quote_char)
+    @on_event.call(event, csv_data)
+  end
+
+  def flush(&block)
+    remainder = @buffer.flush
+    if !remainder.empty?
+      parse(@converter.convert(remainder), &block)
+    end
+  end
+
+  private
+
+  def parse(line, &block)
     begin
-      values = CSV.parse_line(data, :col_sep => @separator, :quote_char => @quote_char)
+      values = CSV.parse_line(line, :col_sep => @separator, :quote_char => @quote_char)
+      return if values.nil?
 
       if (@autodetect_column_names && @columns.empty?)
         @columns = values
@@ -131,25 +164,10 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
 
       yield LogStash::Event.new(decoded)
     rescue CSV::MalformedCSVError => e
-      @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => data)
-      yield LogStash::Event.new("message" => data, "tags" => ["_csvparsefailure"])
+      @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => line)
+      yield LogStash::Event.new("message" => line, "tags" => ["_csvparsefailure"])
     end
   end
-
-  def encode(event)
-    if @include_headers
-      csv_data = CSV.generate_line(select_keys(event), :col_sep => @separator, :quote_char => @quote_char, :headers => true)
-      @on_event.call(event, csv_data)
-
-      # output headers only once per codec lifecycle
-      @include_headers = false
-    end
-
-    csv_data = CSV.generate_line(select_values(event), :col_sep => @separator, :quote_char => @quote_char)
-    @on_event.call(event, csv_data)
-  end
-
-  private
 
   def select_values(event)
     if @columns.empty?

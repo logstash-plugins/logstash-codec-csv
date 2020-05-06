@@ -22,6 +22,32 @@ describe LogStash::Codecs::CSV do
       end
     end
 
+    describe "multiple lines" do
+      let(:data) { "big,bird\nsesame,street\nfoo,bar\n" }
+
+      it "return events from CSV data" do
+        events = []
+        codec.decode(data) {|event| events << event}
+        expect(events.size).to eq(3)
+        expect(events[0].get("column1")).to eq("big")
+        expect(events[0].get("column2")).to eq("bird")
+        expect(events[1].get("column1")).to eq("sesame")
+        expect(events[1].get("column2")).to eq("street")
+        expect(events[2].get("column1")).to eq("foo")
+        expect(events[2].get("column2")).to eq("bar")
+      end
+    end
+
+    describe "empty lines" do
+      let(:data) { "big,bird\n\n\nsesame,street\nfoo,bar\n\n\n" }
+
+      it "return events from CSV data" do
+        events = []
+        codec.decode(data) {|event| events << event}
+        expect(events.size).to eq(3)
+      end
+    end
+
     describe "given column names" do
       let(:doc)    { "big,bird,sesame street" }
       let(:config) do
@@ -37,9 +63,7 @@ describe LogStash::Codecs::CSV do
       end
 
       context "parse csv skipping empty columns" do
-
         let(:data)    { "val1,,val3" }
-
         let(:config) do
           { "skip_empty_columns" => true,
             "columns" => ["custom1", "custom2", "custom3"] }
@@ -55,11 +79,12 @@ describe LogStash::Codecs::CSV do
       end
 
       context "parse csv without autogeneration of names" do
-
         let(:data)    { "val1,val2,val3" }
         let(:config) do
-          {  "autogenerate_column_names" => false,
-             "columns" => ["custom1", "custom2"] }
+          {
+            "autogenerate_column_names" => false,
+            "columns" => ["custom1", "custom2"]
+          }
         end
 
         it "extract all the values" do
@@ -70,12 +95,10 @@ describe LogStash::Codecs::CSV do
           end
         end
       end
-
     end
 
     describe "custom separator" do
       let(:data) { "big,bird;sesame street" }
-
       let(:config) do
         { "separator" => ";" }
       end
@@ -92,7 +115,7 @@ describe LogStash::Codecs::CSV do
       let(:data) { "big,bird,'sesame street'" }
 
       let(:config) do
-        { "quote_char" => "'"}
+        { "quote_char" => "'" }
       end
 
       it "return an event from CSV data" do
@@ -133,15 +156,12 @@ describe LogStash::Codecs::CSV do
     end
 
     describe "having headers" do
-
       let(:data) do
         [ "size,animal,movie", "big,bird,sesame street"]
       end
-
       let(:new_data) do
         [ "host,country,city", "example.com,germany,berlin"]
       end
-
       let(:config) do
         { "autodetect_column_names" => true }
       end
@@ -157,7 +177,6 @@ describe LogStash::Codecs::CSV do
     end
 
     describe "using field convertion" do
-
       let(:config) do
         { "convert" => { "column1" => "integer", "column3" => "boolean" } }
       end
@@ -172,7 +191,6 @@ describe LogStash::Codecs::CSV do
       end
 
       context "when using column names" do
-
         let(:config) do
           { "convert" => { "custom1" => "integer", "custom3" => "boolean" },
             "columns" => ["custom1", "custom2", "custom3"] }
