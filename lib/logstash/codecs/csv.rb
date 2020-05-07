@@ -114,7 +114,9 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   end
 
   def decode(data, &block)
+    puts("*** data=#{data.inspect}")
     @buffer.extract(data).each do |line|
+      puts("*** line=#{line.inspect}")
       parse(@converter.convert(line), &block)
     end
   end
@@ -135,6 +137,7 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   def flush(&block)
     remainder = @buffer.flush
     if !remainder.empty?
+      puts("flush: remainder=#{remainder}")
       parse(@converter.convert(remainder), &block)
     end
   end

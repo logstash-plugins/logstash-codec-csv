@@ -48,6 +48,18 @@ describe LogStash::Codecs::CSV do
       end
     end
 
+    describe "flush" do
+      let(:data) { "big,bird\nsesame,street" }
+
+      it "return events from CSV data" do
+        events = []
+        codec.decode(data) {|event| events << event}
+        expect(events.size).to eq(1)
+        codec.flush {|event| events << event}
+        expect(events.size).to eq(2)
+      end
+    end
+
     describe "given column names" do
       let(:doc)    { "big,bird,sesame street" }
       let(:config) do
