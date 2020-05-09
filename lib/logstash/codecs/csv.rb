@@ -62,6 +62,12 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   # "CP1252".
   config :charset, :validate => ::Encoding.name_list, :default => "UTF-8"
 
+  # The input type the associated input plugin is providing. Inputs such as the file or http input
+  # plugins which provide complete data chunks such as lines or documents to the codec need the `line`
+  # input type, while other inputs such as stdin or tcp where data can be incomplete across data
+  # chunks need to use the 'stream' input type.
+  config :input_type, :validate => ["line", "stream"], :default => "line"
+
   CONVERTERS = {
     :integer => lambda do |value|
       CSV::Converters[:integer].call(value)
@@ -92,7 +98,10 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   CONVERTERS.freeze
 
   def register
-    @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
+    @streaming = @input_type == "stream"
+    if @streaming
+      @buffer = FileWatch::BufferedTokenizer.new(@delimiter)
+    end
     @converter = LogStash::Util::Charset.new(@charset)
     @converter.logger = @logger
 
@@ -114,8 +123,12 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   end
 
   def decode(data, &block)
-    @buffer.extract(data).each do |line|
-      parse(@converter.convert(line), &block)
+    if @streaming
+      @buffer.extract(data).each do |line|
+        parse(@converter.convert(line), &block)
+      end
+    else
+      parse(@converter.convert(data), &block)
     end
   end
 
@@ -133,9 +146,11 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   end
 
   def flush(&block)
-    remainder = @buffer.flush
-    if !remainder.empty?
-      parse(@converter.convert(remainder), &block)
+    if @streaming
+      remainder = @buffer.flush
+      if !remainder.empty?
+        parse(@converter.convert(remainder), &block)
+      end
     end
   end
 
@@ -143,29 +158,30 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
 
   def parse(line, &block)
     begin
-      values = CSV.parse_line(line, :col_sep => @separator, :quote_char => @quote_char)
-      return if values.nil?
+      CSV.parse(line, :col_sep => @separator, :quote_char => @quote_char).each do |values|
+        next if values.nil? || values.empty?
 
-      if (@autodetect_column_names && @columns.empty?)
-        @columns = values
-        @logger.debug? && @logger.debug("Auto detected the following columns", :columns => @columns.inspect)
-        return
-      end
+        if (@autodetect_column_names && @columns.empty?)
+          @columns = values
+          @logger.debug? && @logger.debug("Auto detected the following columns", :columns => @columns.inspect)
+          next
+        end
 
-      decoded = {}
-      values.each_index do |i|
-        unless (@skip_empty_columns && (values[i].nil? || values[i].empty?))
-          unless ignore_field?(i)
-            field_name = @columns[i] || "column#{i + 1}"
-            decoded[field_name] = transform(field_name, values[i])
+        decoded = {}
+        values.each_index do |i|
+          unless (@skip_empty_columns && (values[i].nil? || values[i].empty?))
+            unless ignore_field?(i)
+              field_name = @columns[i] || "column#{i + 1}"
+              decoded[field_name] = transform(field_name, values[i])
+            end
           end
         end
-      end
 
-      yield LogStash::Event.new(decoded)
-    rescue CSV::MalformedCSVError => e
-      @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => line)
-      yield LogStash::Event.new("message" => line, "tags" => ["_csvparsefailure"])
+        yield LogStash::Event.new(decoded)
+      rescue CSV::MalformedCSVError => e
+        @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => line)
+        yield LogStash::Event.new("message" => line, "tags" => ["_csvparsefailure"])
+      end
     end
   end
 
