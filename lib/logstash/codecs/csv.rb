@@ -107,10 +107,16 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   CONVERTERS.default = lambda {|v| v}
   CONVERTERS.freeze
 
-  def register
+  def initialize(*params)
+    super
+
+    @original_field = ecs_select[disabled: nil, v1: '[event][original]']
+
     @converter = LogStash::Util::Charset.new(@charset)
     @converter.logger = @logger
+  end
 
+  def register
     # validate conversion types to be the valid ones.
     bad_types = @convert.values.select do |type|
       !CONVERTERS.has_key?(type.to_sym)
@@ -147,10 +153,12 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
         end
       end
 
-      yield targeted_event_factory.new_event(decoded)
+      event = targeted_event_factory.new_event(decoded)
+      event.set(@original_field, data.dup.freeze) if @original_field
+      yield event
     rescue CSV::MalformedCSVError => e
-      @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => data)
-      yield LogStash::Event.new("message" => data, "tags" => ["_csvparsefailure"])
+      @logger.error("CSV parse failure. Falling back to plain-text", :exception => e.class, :message => e.message, :data => data)
+      yield event_factory.new_event("message" => data, "tags" => ["_csvparsefailure"])
     end
   end
 
