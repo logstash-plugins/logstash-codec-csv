@@ -3,14 +3,21 @@ require "logstash/codecs/base"
 require "logstash/util/charset"
 
 require 'logstash/plugin_mixins/ecs_compatibility_support'
-require 'logstash/plugin_mixins/event_support'
+require 'logstash/plugin_mixins/ecs_compatibility_support/target_check'
+require 'logstash/plugin_mixins/validator_support/field_reference_validation_adapter'
+require 'logstash/plugin_mixins/event_support/event_factory_adapter'
+require 'logstash/plugin_mixins/event_support/from_json_helper'
 
 require "csv"
 
 class LogStash::Codecs::CSV < LogStash::Codecs::Base
 
-  include LogStash::PluginMixins::ECSCompatibilitySupport
-  include LogStash::PluginMixins::EventSupport
+  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1, :v8 => :v1)
+  include LogStash::PluginMixins::ECSCompatibilitySupport::TargetCheck
+
+  extend LogStash::PluginMixins::ValidatorSupport::FieldReferenceValidationAdapter
+
+  include LogStash::PluginMixins::EventSupport::EventFactoryAdapter
 
   config_name "csv"
 
@@ -69,7 +76,7 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   # If this setting is omitted, data gets stored at the root (top level) of the event.
   #
   # NOTE: the target is only relevant while decoding data into a new event.
-  config :target, :validate => :string
+  config :target, :validate => :field_reference
 
   CONVERTERS = {
     :integer => lambda do |value|
@@ -142,7 +149,7 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
         end
       end
 
-      yield new_event(decoded, target_namespace: target)
+      yield targeted_event_factory.new_event(decoded)
     rescue CSV::MalformedCSVError => e
       @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => data)
       yield LogStash::Event.new("message" => data, "tags" => ["_csvparsefailure"])
