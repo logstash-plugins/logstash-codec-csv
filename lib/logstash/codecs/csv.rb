@@ -138,11 +138,11 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
       end
 
       decoded = {}
-      values.each_index do |i|
-        unless (@skip_empty_columns && (values[i].nil? || values[i].empty?))
+      values.each_with_index do |value, i|
+        unless (@skip_empty_columns && (value.nil? || value.empty?))
           unless ignore_field?(i)
             field_name = @columns[i] || "column#{i + 1}"
-            decoded[field_name] = transform(field_name, values[i])
+            decoded[field_name] = transform(field_name, value)
           end
         end
       end
