@@ -118,12 +118,10 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
     raise(LogStash::ConfigurationError, "Invalid conversion types: #{bad_types.join(', ')}") unless bad_types.empty?
 
     # @convert_symbols contains the symbolized types to avoid symbol conversion in the transform method
-    @convert_symbols = @convert.each_with_object({}){|(k, v), result| result[k] = v.to_sym}
+    @convert_symbols = @convert.each_with_object({}) { |(k, v), result| result[k] = v.to_sym }
 
     # if the zero byte character is entered in the config, set the value
-    if (@quote_char == "\\x00")
-      @quote_char = "\x00"
-    end
+    @quote_char = "\x00" if @quote_char == "\\x00"
 
     @logger.debug? && @logger.debug("CSV parsing options", :col_sep => @separator, :quote_char => @quote_char)
   end
