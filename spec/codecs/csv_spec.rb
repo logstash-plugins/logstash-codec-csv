@@ -1,6 +1,7 @@
 # encoding: utf-8
+require "logstash/devutils/rspec/spec_helper"
 require "logstash/codecs/csv"
-require "logstash/event"
+
 require 'logstash/plugin_mixins/ecs_compatibility_support/spec_helper'
 
 describe LogStash::Codecs::CSV, :ecs_compatibility_support do
@@ -17,10 +18,6 @@ describe LogStash::Codecs::CSV, :ecs_compatibility_support do
     let(:data) { "big,bird,sesame street" }
 
     ecs_compatibility_matrix(:disabled, :v1, :v8 => :v1) do |ecs_select|
-
-      # before(:each) do
-      #   allow_any_instance_of(described_class).to receive(:ecs_compatibility).and_return(ecs_compatibility)
-      # end
 
       it "return an event from CSV data" do
         event_count = 0

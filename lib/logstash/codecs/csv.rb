@@ -1,6 +1,7 @@
 # encoding: utf-8
 require "logstash/codecs/base"
 require "logstash/util/charset"
+require "logstash/event"
 
 require 'logstash/plugin_mixins/ecs_compatibility_support'
 require 'logstash/plugin_mixins/ecs_compatibility_support/target_check'
