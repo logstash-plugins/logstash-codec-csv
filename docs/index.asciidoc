@@ -22,8 +22,15 @@ include::{include_path}/plugin_header.asciidoc[]
 
 The csv codec takes CSV data, parses it and passes it along.
 
+[id="plugins-{type}s-{plugin}-ecs"]
+==== Compatibility with the Elastic Common Schema (ECS)
+
+The plugin behaves the same regardless of ECS compatibility, except giving a warning when ECS is enabled and `target` isn't set.
+
+TIP: Set the `target` option to avoid potential schema conflicts.
+
 [id="plugins-{type}s-{plugin}-options"]
-==== Csv Codec Configuration Options
+==== Csv Codec configuration options
 
 [cols="<,<,<",options="header",]
 |=======================================================================
