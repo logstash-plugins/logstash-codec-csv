@@ -19,6 +19,8 @@ describe LogStash::Codecs::CSV, :ecs_compatibility_support do
 
     ecs_compatibility_matrix(:disabled, :v1, :v8 => :v1) do |ecs_select|
 
+      let(:config) { super().merge('ecs_compatibility' => ecs_select.active_mode.to_s) }
+
       it "return an event from CSV data" do
         event_count = 0
         codec.decode(data) do |event|
@@ -198,7 +200,7 @@ describe LogStash::Codecs::CSV, :ecs_compatibility_support do
 
       context "with target" do
 
-        let(:config) { super().merge('target' => '[csv-root]', 'ecs_compatibility' => ecs_select.active_mode.to_s) }
+        let(:config) { super().merge('target' => '[csv-root]') }
 
         it "return an event from CSV data" do
           event_count = 0
