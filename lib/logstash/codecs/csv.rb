@@ -1,9 +1,24 @@
 # encoding: utf-8
 require "logstash/codecs/base"
 require "logstash/util/charset"
+require "logstash/event"
+
+require 'logstash/plugin_mixins/ecs_compatibility_support'
+require 'logstash/plugin_mixins/ecs_compatibility_support/target_check'
+require 'logstash/plugin_mixins/validator_support/field_reference_validation_adapter'
+require 'logstash/plugin_mixins/event_support/event_factory_adapter'
+require 'logstash/plugin_mixins/event_support/from_json_helper'
+
 require "csv"
 
 class LogStash::Codecs::CSV < LogStash::Codecs::Base
+
+  include LogStash::PluginMixins::ECSCompatibilitySupport(:disabled, :v1, :v8 => :v1)
+  include LogStash::PluginMixins::ECSCompatibilitySupport::TargetCheck
+
+  extend LogStash::PluginMixins::ValidatorSupport::FieldReferenceValidationAdapter
+
+  include LogStash::PluginMixins::EventSupport::EventFactoryAdapter
 
   config_name "csv"
 
@@ -58,6 +73,12 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   # "CP1252".
   config :charset, :validate => ::Encoding.name_list, :default => "UTF-8"
 
+  # Defines a target field for placing decoded fields.
+  # If this setting is omitted, data gets stored at the root (top level) of the event.
+  #
+  # NOTE: the target is only relevant while decoding data into a new event.
+  config :target, :validate => :field_reference
+
   CONVERTERS = {
     :integer => lambda do |value|
       CSV::Converters[:integer].call(value)
@@ -87,10 +108,16 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
   CONVERTERS.default = lambda {|v| v}
   CONVERTERS.freeze
 
-  def register
+  def initialize(*params)
+    super
+
+    @original_field = ecs_select[disabled: nil, v1: '[event][original]']
+
     @converter = LogStash::Util::Charset.new(@charset)
     @converter.logger = @logger
+  end
 
+  def register
     # validate conversion types to be the valid ones.
     bad_types = @convert.values.select do |type|
       !CONVERTERS.has_key?(type.to_sym)
@@ -98,12 +125,10 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
     raise(LogStash::ConfigurationError, "Invalid conversion types: #{bad_types.join(', ')}") unless bad_types.empty?
 
     # @convert_symbols contains the symbolized types to avoid symbol conversion in the transform method
-    @convert_symbols = @convert.each_with_object({}){|(k, v), result| result[k] = v.to_sym}
+    @convert_symbols = @convert.each_with_object({}) { |(k, v), result| result[k] = v.to_sym }
 
     # if the zero byte character is entered in the config, set the value
-    if (@quote_char == "\\x00")
-      @quote_char = "\x00"
-    end
+    @quote_char = "\x00" if @quote_char == "\\x00"
 
     @logger.debug? && @logger.debug("CSV parsing options", :col_sep => @separator, :quote_char => @quote_char)
   end
@@ -120,19 +145,21 @@ class LogStash::Codecs::CSV < LogStash::Codecs::Base
       end
 
       decoded = {}
-      values.each_index do |i|
-        unless (@skip_empty_columns && (values[i].nil? || values[i].empty?))
+      values.each_with_index do |value, i|
+        unless (@skip_empty_columns && (value.nil? || value.empty?))
           unless ignore_field?(i)
             field_name = @columns[i] || "column#{i + 1}"
-            decoded[field_name] = transform(field_name, values[i])
+            decoded[field_name] = transform(field_name, value)
           end
         end
       end
 
-      yield LogStash::Event.new(decoded)
+      event = targeted_event_factory.new_event(decoded)
+      event.set(@original_field, data.dup.freeze) if @original_field
+      yield event
     rescue CSV::MalformedCSVError => e
-      @logger.error("CSV parse failure. Falling back to plain-text", :error => e, :data => data)
-      yield LogStash::Event.new("message" => data, "tags" => ["_csvparsefailure"])
+      @logger.error("CSV parse failure. Falling back to plain-text", :exception => e.class, :message => e.message, :data => data)
+      yield event_factory.new_event("message" => data, "tags" => ["_csvparsefailure"])
     end
   end
 
