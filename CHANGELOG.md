@@ -1,3 +1,6 @@
+## 1.1.1
+  - Pin `csv` dependency to `< 3.2.6` to avoid a JRuby CSV.parse_line performance regression (on decode) introduced in csv 3.2.6 [#11](https://github.com/logstash-plugins/logstash-codec-csv/pull/11)
+
 ## 1.1.0
   - Feat: added target => namespace support + ECS compatibility [#7](https://github.com/logstash-plugins/logstash-codec-csv/pull/7)
 
