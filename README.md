@@ -1,5 +1,7 @@
 # Logstash CSV Codec
 
+[![Unit Tests](https://github.com/logstash-plugins/logstash-codec-csv/actions/workflows/unit-tests.yml/badge.svg?branch=main)](https://github.com/logstash-plugins/logstash-codec-csv/actions/workflows/unit-tests.yml)
+
 ## WIP: Under Development, NOT FOR PRODUCTION
 
 This is a plugin for [Logstash](https://github.com/elasticsearch/logstash).
